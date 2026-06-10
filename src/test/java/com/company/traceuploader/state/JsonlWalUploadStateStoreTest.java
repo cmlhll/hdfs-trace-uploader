@@ -1,0 +1,3 @@
+package com.company.traceuploader.state;
+import org.junit.jupiter.api.*;import java.nio.file.*;import static org.junit.jupiter.api.Assertions.*;
+class JsonlWalUploadStateStoreTest { @TempDir Path dir; @Test void persistsAndRecoversLatestState() throws Exception { Path wal=dir.resolve("state/upload.jsonl"); UploadFileRecord r=new UploadFileRecord(); r.fileId="f1"; r.localPath="/tmp/a"; r.state=UploadState.DISCOVERED; try(JsonlWalUploadStateStore s=new JsonlWalUploadStateStore(wal)){ s.upsert(r); s.updateState("f1",UploadState.MANIFEST_COMMITTED,null); } try(JsonlWalUploadStateStore s=new JsonlWalUploadStateStore(wal)){ assertEquals(UploadState.MANIFEST_COMMITTED,s.getByFileId("f1").orElseThrow().state); assertTrue(s.findPending(10).isEmpty()); } } }
