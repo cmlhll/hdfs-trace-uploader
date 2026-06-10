@@ -1,0 +1,78 @@
+agent:
+  app: payment
+  env: dev
+  region: local
+  cluster: c1
+  host: host001
+  agentId: host001-local-test-uploader
+  agentVersion: 0.1.0
+
+localSpool:
+  baseDir: /tmp/trace_spool
+  writingDir: /tmp/trace_spool/writing
+  sealedDir: /tmp/trace_spool/sealed
+  committedDir: /tmp/trace_spool/committed
+  failedDir: /tmp/trace_spool/failed
+  quarantineDir: /tmp/trace_spool/quarantine
+  stateDir: /tmp/trace_spool/state
+  tmpDir: /tmp/trace_spool/tmp
+
+scanner:
+  markerSuffix: .done
+  dataFileSuffixes:
+    - .jsonl
+    - .jsonl.zst
+    - .log
+    - .log.zst
+  ignoredSuffixes:
+    - .tmp
+    - .part
+    - .uploading
+  minStableAgeSeconds: 1
+  maxFilesPerScan: 100
+  scanIntervalSeconds: 5
+
+hdfs:
+  implementation: hadoop        # localfs | hadoop
+  hadoopConfDir: ${HADOOP_CONF_DIR}
+  fsDefaultFS: hdfs://localhost:9000
+  kerberosEnabled: false
+  rawBasePath: /warehouse/raw_trace
+  stagingBasePath: /warehouse/raw_trace/_staging
+  manifestBasePath: /warehouse/raw_trace_manifest
+  finalPathTemplate: "{rawBasePath}/app={app}/dt={dt}/hour={hour}/region={region}/bucket={bucket}/{fileName}"
+  stagingPathTemplate: "{stagingBasePath}/app={app}/dt={dt}/hour={hour}/region={region}/bucket={bucket}/{fileId}.attempt_{attempt}.tmp"
+  bucketCount: 16
+
+upload:
+  maxConcurrentUploads: 1
+  maxUploadBandwidthBytesPerSec: 0
+  verifyChecksumAfterUpload: false
+  verifySizeAfterUpload: true
+  deleteStagingOnRetry: true
+
+retry:
+  maxAttempts: 5
+  initialBackoffSeconds: 2
+  maxBackoffSeconds: 60
+  backoffMultiplier: 2.0
+
+manifest:
+  type: local_jsonl
+  localPath: /tmp/trace_spool/state/manifest.jsonl
+  writeIfAbsent: true
+
+gc:
+  enabled: false
+  delayHoursAfterManifestCommit: 24
+  deleteDoneMarker: true
+  moveToCommittedBeforeDelete: true
+
+diskWatermark:
+  warnPercent: 70
+  errorPercent: 85
+  criticalPercent: 92
+
+metrics:
+  enabled: true
+  prometheusPort: 9409

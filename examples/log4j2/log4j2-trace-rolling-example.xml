@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+  <Appenders>
+    <RollingFile
+        name="TraceFile"
+        fileName="/data/trace_spool/writing/trace.log"
+        filePattern="/data/trace_spool/sealed/trace-payment-prod-useast-c1-${hostName}-%d{yyyyMMdd'T'HHmmss}-%i.jsonl.zst">
+      <PatternLayout pattern="%m%n"/>
+      <Policies>
+        <SizeBasedTriggeringPolicy size="1 GB"/>
+        <TimeBasedTriggeringPolicy interval="5" modulate="true"/>
+      </Policies>
+      <!-- max should be large enough; uploader owns GC after HDFS commit. -->
+      <DefaultRolloverStrategy max="10000"/>
+    </RollingFile>
+  </Appenders>
+  <Loggers>
+    <Logger name="trace" level="info" additivity="false">
+      <AppenderRef ref="TraceFile"/>
+    </Logger>
+    <Root level="info"/>
+  </Loggers>
+</Configuration>
