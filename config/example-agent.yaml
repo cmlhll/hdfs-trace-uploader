@@ -1,37 +1,40 @@
 agent:
   app: payment
-  env: prod
-  region: us-east
+  env: dev
+  region: local
   cluster: c1
   host: host001
   agentId: host001-trace-uploader
   agentVersion: 0.1.0
 
 localSpool:
-  baseDir: /data/trace_spool
-  writingDir: /data/trace_spool/writing
-  sealedDir: /data/trace_spool/sealed
-  committedDir: /data/trace_spool/committed
-  failedDir: /data/trace_spool/failed
-  quarantineDir: /data/trace_spool/quarantine
-  stateDir: /data/trace_spool/state
-  tmpDir: /data/trace_spool/tmp
+  baseDir: /tmp/trace_spool
+  writingDir: /tmp/trace_spool/writing
+  sealedDir: /tmp/trace_spool/sealed
+  committedDir: /tmp/trace_spool/committed
+  failedDir: /tmp/trace_spool/failed
+  quarantineDir: /tmp/trace_spool/quarantine
+  stateDir: /tmp/trace_spool/state
+  tmpDir: /tmp/trace_spool/tmp
 
 scanner:
   markerSuffix: .done
   dataFileSuffixes:
+    - .jsonl
     - .jsonl.zst
+    - .log
     - .log.zst
   ignoredSuffixes:
     - .tmp
     - .part
     - .uploading
-  minStableAgeSeconds: 30
+  minStableAgeSeconds: 0
   maxFilesPerScan: 1000
   scanIntervalSeconds: 10
 
 hdfs:
   implementation: localfs   # localfs | hadoop
+  localRootForTesting: /tmp/fake_hdfs
   hadoopConfDir: /etc/hadoop/conf
   nameService: ns1
   rawBasePath: /warehouse/raw_trace
@@ -39,7 +42,7 @@ hdfs:
   manifestBasePath: /warehouse/raw_trace_manifest
   finalPathTemplate: "{rawBasePath}/app={app}/dt={dt}/hour={hour}/region={region}/bucket={bucket}/{fileName}"
   stagingPathTemplate: "{stagingBasePath}/app={app}/dt={dt}/hour={hour}/region={region}/bucket={bucket}/{fileId}.attempt_{attempt}.tmp"
-  bucketCount: 128
+  bucketCount: 16
 
 upload:
   maxConcurrentUploads: 2
@@ -56,7 +59,7 @@ retry:
 
 manifest:
   type: local_jsonl   # local_jsonl | hdfs_jsonl | jdbc | iceberg
-  localPath: /data/trace_spool/state/manifest.jsonl
+  localPath: /tmp/trace_spool/state/manifest.jsonl
   writeIfAbsent: true
 
 gc:
