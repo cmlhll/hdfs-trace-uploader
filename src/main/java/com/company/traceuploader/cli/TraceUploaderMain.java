@@ -5,7 +5,6 @@ import com.company.traceuploader.config.ConfigLoader;
 import com.company.traceuploader.scanner.LocalSealedFileScanner;
 import com.company.traceuploader.scanner.SealedFile;
 import com.company.traceuploader.scanner.SealedFileScanner;
-import com.company.traceuploader.worker.UploaderWorker;
 
 import java.io.IOException;
 import java.lang.System.Logger;
@@ -31,33 +30,32 @@ public final class TraceUploaderMain {
 
         AgentConfig config = new ConfigLoader().load(options.configPath());
         Files.createDirectories(config.localSpool().sealedDir());
-        Files.createDirectories(config.localSpool().stateDir());
         SealedFileScanner scanner = new LocalSealedFileScanner(config.localSpool().sealedDir(), config.scanner(), Clock.systemUTC());
 
         LOG.log(Level.INFO, "Loaded config {0}; dryRun={1}; once={2}", options.configPath(), options.dryRun(), options.once());
-        if (options.dryRun()) {
-            scanOnly(scanner, true);
-            return;
-        }
-        if (options.once()) {
-            new UploaderWorker(config, scanner).processOnce();
+        if (options.once() || options.dryRun()) {
+            scanOnce(scanner, options.dryRun());
             return;
         }
 
-        UploaderWorker worker = new UploaderWorker(config, scanner);
         while (!Thread.currentThread().isInterrupted()) {
-            worker.processOnce();
+            scanOnce(scanner, false);
             Thread.sleep(config.scanner().scanIntervalMillis());
         }
     }
 
-    private void scanOnly(SealedFileScanner scanner, boolean dryRun) throws IOException {
+    private void scanOnce(SealedFileScanner scanner, boolean dryRun) throws IOException {
         List<SealedFile> files = scanner.scan();
         String mode = dryRun ? "Dry run" : "Scan";
         LOG.log(Level.INFO, "{0} discovered {1} sealed file(s)", mode, files.size());
         for (SealedFile file : files) {
-            System.out.printf("Would process sealed file: %s (marker=%s, sizeBytes=%d)%n",
-                    file.dataPath(), file.markerPath(), file.sizeBytes());
+            if (dryRun) {
+                System.out.printf("Would process sealed file: %s (marker=%s, sizeBytes=%d)%n",
+                        file.dataPath(), file.markerPath(), file.sizeBytes());
+            } else {
+                System.out.printf("Discovered sealed file: %s (marker=%s, sizeBytes=%d)%n",
+                        file.dataPath(), file.markerPath(), file.sizeBytes());
+            }
         }
     }
 
@@ -71,7 +69,9 @@ public final class TraceUploaderMain {
             for (int i = 0; i < args.length; i++) {
                 switch (args[i]) {
                     case "--config" -> {
-                        if (i + 1 >= args.length) throw new IllegalArgumentException("--config requires a path");
+                        if (i + 1 >= args.length) {
+                            throw new IllegalArgumentException("--config requires a path");
+                        }
                         configPath = Path.of(args[++i]);
                     }
                     case "--dry-run" -> dryRun = true;
@@ -80,7 +80,9 @@ public final class TraceUploaderMain {
                     default -> throw new IllegalArgumentException("Unknown argument: " + args[i] + System.lineSeparator() + usage());
                 }
             }
-            if (!help && configPath == null) throw new IllegalArgumentException("--config is required" + System.lineSeparator() + usage());
+            if (!help && configPath == null) {
+                throw new IllegalArgumentException("--config is required" + System.lineSeparator() + usage());
+            }
             return new CliOptions(configPath, dryRun, once, help);
         }
 

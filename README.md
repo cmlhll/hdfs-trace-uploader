@@ -76,34 +76,6 @@ java -jar target/hdfs-trace-uploader.jar \
 - 数据文件和 marker 的 mtime 都达到 `scanner.minStableMillis`（或兼容的 `minStableAgeSeconds`）；
 - 单轮最多返回 `scanner.maxFilesPerScan` 个文件。
 
-## Phase 2-4 当前实现
-
-在 Phase 0-1 扫描基础上，当前版本已继续实现 LocalFs 模式的文件级提交链路：
-
-- `MetadataService` 从稳定 trace 文件名解析 app/env/region/cluster/host/pid/bootId/start/end/seq；
-- 计算 `size_bytes`、SHA-256 checksum、`record_count`、稳定 `file_id`、bucket、HDFS final path 和 staging path；
-- `JsonlWalUploadStateStore` 将状态变更追加写入本地 JSONL WAL，Agent 重启后可 replay 恢复最新状态；
-- `LocalFsHdfsClient` 用本地目录模拟 HDFS，并禁止覆盖 final 文件；
-- `LocalFsCommitProtocol` 实现 staging upload、校验、rename final、final 已存在且 checksum 一致时幂等成功、final checksum mismatch 时进入 `QUARANTINED`。
-
-### LocalFs 端到端示例
-
-```bash
-mvn package
-rm -rf /tmp/trace_spool /tmp/fake_hdfs
-mkdir -p /tmp/trace_spool/{writing,sealed,committed,failed,quarantine,state,tmp}
-mkdir -p /tmp/fake_hdfs
-cat > /tmp/trace_spool/sealed/trace-payment-dev-local-c1-host001-pid123-bootlocal-20260610T100000-20260610T100500-seq000001.jsonl <<'DATA'
-{"ts":"2026-06-10T10:00:01Z","trace_id":"t1","span_id":"s1","level":"INFO","message":"hello"}
-{"ts":"2026-06-10T10:00:02Z","trace_id":"t2","span_id":"s2","level":"ERROR","message":"failed"}
-DATA
-touch /tmp/trace_spool/sealed/trace-payment-dev-local-c1-host001-pid123-bootlocal-20260610T100000-20260610T100500-seq000001.jsonl.done
-java -jar target/hdfs-trace-uploader.jar --config config/example-agent.yaml --once
-find /tmp/fake_hdfs -type f
-```
-
-重复运行 `--once` 不会产生重复 final 文件；如果 final 已存在且 checksum 一致，会记录幂等成功。
-
 ## 暂未实现
 
-后续 Phase 会继续实现 ManifestWriter、manifest 补写、本地 GC、限流/退避、指标、HadoopHdfsClient、MiniDFSCluster 和本地伪分布式 HDFS E2E。当前版本仍不实现 HadoopHdfsClient。
+后续 Phase 会继续实现 metadata/file_id、落盘状态机、LocalFs/Hadoop HDFS commit protocol、manifest、GC、指标和本地 HDFS E2E。当前 Phase 0-1 不会直接写 HDFS final path，也不会覆盖任何远端文件。
