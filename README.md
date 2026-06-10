@@ -34,3 +34,76 @@ MVP 至少支持两种测试模式：
 
 1. `LocalFsHdfsClient`：不依赖 Hadoop，用本地文件系统模拟 HDFS；
 2. `HadoopHdfsClient`：连接本地伪分布式 HDFS，例如 `hdfs://localhost:9000`。
+
+## Phase 0-1 当前实现
+
+当前代码只实现第一轮范围：Java 17 + Maven 脚手架、CLI 参数解析、项目 YAML 配置加载、基础日志、JUnit 5 测试，以及本地 sealed 文件扫描器。
+
+### 构建与测试
+
+```bash
+mvn test
+mvn package
+```
+
+### Dry run 扫描示例
+
+准备一个带 `.done` marker 的 sealed 文件：
+
+```bash
+mkdir -p /tmp/trace_spool/{writing,sealed,committed,failed,quarantine,state,tmp}
+printf '{"message":"hello"}\n' > /tmp/trace_spool/sealed/trace-payment-dev-local-c1-host001-pid123-bootlocal-20260610T100000-20260610T100500-seq000001.jsonl
+touch /tmp/trace_spool/sealed/trace-payment-dev-local-c1-host001-pid123-bootlocal-20260610T100000-20260610T100500-seq000001.jsonl.done
+```
+
+运行 dry-run：
+
+```bash
+java -jar target/hdfs-trace-uploader.jar \
+  --config config/example-agent.yaml \
+  --dry-run
+```
+
+预期输出会列出将被处理的 sealed 文件，但不会上传 HDFS、写 manifest 或删除本地文件。
+
+### Phase 1 扫描规则
+
+`LocalSealedFileScanner` 只扫描配置中的 `localSpool.sealedDir`，不会递归进入 `writing/` 子目录。候选数据文件必须同时满足：
+
+- 数据文件本身是 regular file；
+- 存在同名 `markerSuffix`（默认 `.done`）marker；
+- 文件名不以 `.tmp`、`.part`、`.uploading` 等忽略后缀结尾；
+- 数据文件和 marker 的 mtime 都达到 `scanner.minStableMillis`（或兼容的 `minStableAgeSeconds`）；
+- 单轮最多返回 `scanner.maxFilesPerScan` 个文件。
+
+## Phase 2-4 当前实现
+
+在 Phase 0-1 扫描基础上，当前版本已继续实现 LocalFs 模式的文件级提交链路：
+
+- `MetadataService` 从稳定 trace 文件名解析 app/env/region/cluster/host/pid/bootId/start/end/seq；
+- 计算 `size_bytes`、SHA-256 checksum、`record_count`、稳定 `file_id`、bucket、HDFS final path 和 staging path；
+- `JsonlWalUploadStateStore` 将状态变更追加写入本地 JSONL WAL，Agent 重启后可 replay 恢复最新状态；
+- `LocalFsHdfsClient` 用本地目录模拟 HDFS，并禁止覆盖 final 文件；
+- `LocalFsCommitProtocol` 实现 staging upload、校验、rename final、final 已存在且 checksum 一致时幂等成功、final checksum mismatch 时进入 `QUARANTINED`。
+
+### LocalFs 端到端示例
+
+```bash
+mvn package
+rm -rf /tmp/trace_spool /tmp/fake_hdfs
+mkdir -p /tmp/trace_spool/{writing,sealed,committed,failed,quarantine,state,tmp}
+mkdir -p /tmp/fake_hdfs
+cat > /tmp/trace_spool/sealed/trace-payment-dev-local-c1-host001-pid123-bootlocal-20260610T100000-20260610T100500-seq000001.jsonl <<'DATA'
+{"ts":"2026-06-10T10:00:01Z","trace_id":"t1","span_id":"s1","level":"INFO","message":"hello"}
+{"ts":"2026-06-10T10:00:02Z","trace_id":"t2","span_id":"s2","level":"ERROR","message":"failed"}
+DATA
+touch /tmp/trace_spool/sealed/trace-payment-dev-local-c1-host001-pid123-bootlocal-20260610T100000-20260610T100500-seq000001.jsonl.done
+java -jar target/hdfs-trace-uploader.jar --config config/example-agent.yaml --once
+find /tmp/fake_hdfs -type f
+```
+
+重复运行 `--once` 不会产生重复 final 文件；如果 final 已存在且 checksum 一致，会记录幂等成功。
+
+## 暂未实现
+
+后续 Phase 会继续实现 ManifestWriter、manifest 补写、本地 GC、限流/退避、指标、HadoopHdfsClient、MiniDFSCluster 和本地伪分布式 HDFS E2E。当前版本仍不实现 HadoopHdfsClient。
