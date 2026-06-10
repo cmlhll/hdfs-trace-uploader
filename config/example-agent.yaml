@@ -47,7 +47,7 @@ hdfs:
 upload:
   maxConcurrentUploads: 2
   maxUploadBandwidthBytesPerSec: 0
-  verifyChecksumAfterUpload: false
+  verifyChecksumAfterUpload: true
   verifySizeAfterUpload: true
   deleteStagingOnRetry: true
 
