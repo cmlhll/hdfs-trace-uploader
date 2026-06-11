@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public final class JsonlWalUploadStateStore implements UploadStateStore {
     private final Path walPath;
@@ -52,12 +53,17 @@ public final class JsonlWalUploadStateStore implements UploadStateStore {
     @Override
     public synchronized List<UploadFileRecord> findPending(int limit) {
         return records.values().stream()
-                .filter(record -> switch (record.state()) {
-                    case LOCAL_GC_DONE, PERMANENT_FAILED, QUARANTINED, COMMITTED_TO_HDFS, MANIFEST_COMMITTED, LOCAL_GC_READY -> false;
-                    default -> true;
+                .filter(record -> {
+                    UploadState s = record.state();
+                    return s != UploadState.LOCAL_GC_DONE
+                        && s != UploadState.PERMANENT_FAILED
+                        && s != UploadState.QUARANTINED
+                        && s != UploadState.COMMITTED_TO_HDFS
+                        && s != UploadState.MANIFEST_COMMITTED
+                        && s != UploadState.LOCAL_GC_READY;
                 })
                 .limit(limit)
-                .toList();
+                .collect(Collectors.toList());
     }
 
     @Override

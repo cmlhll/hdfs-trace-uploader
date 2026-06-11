@@ -36,7 +36,7 @@ public final class UploaderWorker {
     }
 
     public void processOnce() throws Exception {
-        Path walPath = config.localSpool().stateDir().resolve("upload-state.jsonl");
+        Path walPath = config.localSpool().stateDirPath().resolve("upload-state.jsonl");
         try (JsonlWalUploadStateStore stateStore = new JsonlWalUploadStateStore(walPath)) {
             HdfsClient hdfs = createHdfs();
             MetadataService metadataService = new MetadataService(config, new ChecksumService(), new FileIdGenerator());
@@ -82,6 +82,6 @@ public final class UploaderWorker {
         if (!"localfs".equalsIgnoreCase(config.hdfs().implementation())) {
             throw new IllegalArgumentException("Only localfs HDFS implementation is supported in Phase 4: " + config.hdfs().implementation());
         }
-        return new LocalFsHdfsClient(config.hdfs().localRootForTesting());
+        return new LocalFsHdfsClient(config.hdfs().localRootForTestingPath());
     }
 }

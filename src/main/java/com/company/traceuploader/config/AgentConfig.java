@@ -1,111 +1,279 @@
 package com.company.traceuploader.config;
 
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.util.Objects;
 
-/** Configuration used by the Phase 0/1 uploader scaffold. */
+/**
+ * Agent identity configuration plus delegated access to all sub-config sections.
+ *
+ * <p>This class serves both as the {@code agent:} YAML section holder (identity fields)
+ * <b>and</b> as the backward-compatible root config object expected by existing callers.
+ * The {@link ConfigLoader} now returns {@link TraceUploaderConfig} from its {@code load()}
+ * method, but this class retains {@code localSpool()}, {@code scanner()}, {@code hdfs()},
+ * {@code upload()}, {@code retry()}, {@code manifest()}, {@code gc()},
+ * {@code diskWatermark()}, and {@code metrics()} delegates for callers that used the
+ * previous API.</p>
+ *
+ * <p>When populated via YAML deserialization under the {@code agent:} key, only the
+ * identity fields are set. The sub-config references are set by
+ * {@link #injectSubConfigs(TraceUploaderConfig)} after the full YAML is loaded.</p>
+ */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public final class AgentConfig {
-    private final LocalSpool localSpool;
-    private final Scanner scanner;
 
-    public AgentConfig(LocalSpool localSpool, Scanner scanner) {
-        this.localSpool = Objects.requireNonNull(localSpool, "localSpool");
-        this.scanner = Objects.requireNonNull(scanner, "scanner");
+    // ---- identity fields (from the agent: section) ----
+
+    private String app = "payment";
+    private String env = "dev";
+    private String region = "local";
+    private String cluster = "c1";
+    private String host = "host001";
+    private String agentId = "host001-trace-uploader";
+    private String agentVersion = "0.1.0";
+
+    // ---- delegated sub-config references (set by injectSubConfigs) ----
+    // Package-private so TraceUploaderConfig can set them.
+
+    private LocalSpoolConfig localSpool = new LocalSpoolConfig();
+    private ScannerConfig scanner = new ScannerConfig();
+    private HdfsConfig hdfs = new HdfsConfig();
+    private UploadConfig upload = new UploadConfig();
+    private RetryConfig retry = new RetryConfig();
+    private ManifestConfig manifest = new ManifestConfig();
+    private GcConfig gc = new GcConfig();
+    private DiskWatermarkConfig diskWatermark = new DiskWatermarkConfig();
+    private MetricsConfig metrics = new MetricsConfig();
+
+    // ---- constructors ----
+
+    /** Default constructor for Jackson deserialization. */
+    public AgentConfig() {
     }
 
-    public LocalSpool localSpool() {
+    // ---- Jackson getters/setters (agent: identity fields) ----
+
+    public String getApp() {
+        return app;
+    }
+
+    public void setApp(String app) {
+        this.app = app;
+    }
+
+    public String getEnv() {
+        return env;
+    }
+
+    public void setEnv(String env) {
+        this.env = env;
+    }
+
+    public String getRegion() {
+        return region;
+    }
+
+    public void setRegion(String region) {
+        this.region = region;
+    }
+
+    public String getCluster() {
+        return cluster;
+    }
+
+    public void setCluster(String cluster) {
+        this.cluster = cluster;
+    }
+
+    public String getHost() {
+        return host;
+    }
+
+    public void setHost(String host) {
+        this.host = host;
+    }
+
+    public String getAgentId() {
+        return agentId;
+    }
+
+    public void setAgentId(String agentId) {
+        this.agentId = agentId;
+    }
+
+    public String getAgentVersion() {
+        return agentVersion;
+    }
+
+    public void setAgentVersion(String agentVersion) {
+        this.agentVersion = agentVersion;
+    }
+
+    // ---- fluent accessors (backward compat) ----
+
+    public String app() {
+        return app;
+    }
+
+    public String env() {
+        return env;
+    }
+
+    public String region() {
+        return region;
+    }
+
+    public String cluster() {
+        return cluster;
+    }
+
+    public String host() {
+        return host;
+    }
+
+    public String agentId() {
+        return agentId;
+    }
+
+    public String agentVersion() {
+        return agentVersion;
+    }
+
+    // ---- sub-config delegate accessors (backward compat with old API) ----
+
+    public LocalSpoolConfig localSpool() {
         return localSpool;
     }
 
-    public Scanner scanner() {
+    public ScannerConfig scanner() {
         return scanner;
     }
 
-    public static final class LocalSpool {
-        private Path sealedDir;
-        private Path writingDir;
-
-        public Path sealedDir() {
-            return sealedDir;
-        }
-
-        public void setSealedDir(Path sealedDir) {
-            this.sealedDir = sealedDir;
-        }
-
-        public Path writingDir() {
-            return writingDir;
-        }
-
-        public void setWritingDir(Path writingDir) {
-            this.writingDir = writingDir;
-        }
-
-        void validate() {
-            if (sealedDir == null) {
-                throw new IllegalArgumentException("localSpool.sealedDir is required");
-            }
-        }
+    public HdfsConfig hdfs() {
+        return hdfs;
     }
 
-    public static final class Scanner {
-        private String markerSuffix = ".done";
-        private final List<String> ignoredSuffixes = new ArrayList<>(List.of(".tmp", ".part", ".uploading"));
-        private long minStableMillis = 0;
-        private int maxFilesPerScan = 1000;
-        private long scanIntervalMillis = 10_000;
+    public UploadConfig upload() {
+        return upload;
+    }
 
-        public String markerSuffix() {
-            return markerSuffix;
-        }
+    public RetryConfig retry() {
+        return retry;
+    }
 
-        public void setMarkerSuffix(String markerSuffix) {
-            this.markerSuffix = markerSuffix;
-        }
+    public ManifestConfig manifest() {
+        return manifest;
+    }
 
-        public List<String> ignoredSuffixes() {
-            return ignoredSuffixes;
-        }
+    public GcConfig gc() {
+        return gc;
+    }
 
-        public long minStableMillis() {
-            return minStableMillis;
-        }
+    public DiskWatermarkConfig diskWatermark() {
+        return diskWatermark;
+    }
 
-        public void setMinStableMillis(long minStableMillis) {
-            this.minStableMillis = minStableMillis;
-        }
+    public MetricsConfig metrics() {
+        return metrics;
+    }
 
-        public int maxFilesPerScan() {
-            return maxFilesPerScan;
-        }
+    // ---- package-private setters for sub-config injection ----
 
-        public void setMaxFilesPerScan(int maxFilesPerScan) {
-            this.maxFilesPerScan = maxFilesPerScan;
-        }
+    void setLocalSpool(LocalSpoolConfig localSpool) {
+        this.localSpool = localSpool != null ? localSpool : new LocalSpoolConfig();
+    }
 
-        public long scanIntervalMillis() {
-            return scanIntervalMillis;
-        }
+    void setScanner(ScannerConfig scanner) {
+        this.scanner = scanner != null ? scanner : new ScannerConfig();
+    }
 
-        public void setScanIntervalMillis(long scanIntervalMillis) {
-            this.scanIntervalMillis = scanIntervalMillis;
-        }
+    void setHdfs(HdfsConfig hdfs) {
+        this.hdfs = hdfs != null ? hdfs : new HdfsConfig();
+    }
 
-        void validate() {
-            if (markerSuffix == null || markerSuffix.isBlank()) {
-                throw new IllegalArgumentException("scanner.markerSuffix must not be blank");
-            }
-            if (minStableMillis < 0) {
-                throw new IllegalArgumentException("scanner.minStableMillis must be >= 0");
-            }
-            if (maxFilesPerScan <= 0) {
-                throw new IllegalArgumentException("scanner.maxFilesPerScan must be > 0");
-            }
-            if (scanIntervalMillis <= 0) {
-                throw new IllegalArgumentException("scanner.scanIntervalMillis must be > 0");
-            }
-        }
+    void setUpload(UploadConfig upload) {
+        this.upload = upload != null ? upload : new UploadConfig();
+    }
+
+    void setRetry(RetryConfig retry) {
+        this.retry = retry != null ? retry : new RetryConfig();
+    }
+
+    void setManifest(ManifestConfig manifest) {
+        this.manifest = manifest != null ? manifest : new ManifestConfig();
+    }
+
+    void setGc(GcConfig gc) {
+        this.gc = gc != null ? gc : new GcConfig();
+    }
+
+    void setDiskWatermark(DiskWatermarkConfig diskWatermark) {
+        this.diskWatermark = diskWatermark != null ? diskWatermark : new DiskWatermarkConfig();
+    }
+
+    void setMetrics(MetricsConfig metrics) {
+        this.metrics = metrics != null ? metrics : new MetricsConfig();
+    }
+
+    /**
+     * Injects all sub-config sections from a fully-loaded {@link TraceUploaderConfig}
+     * into this AgentConfig, overwriting the defaults.
+     */
+    void injectSubConfigs(TraceUploaderConfig root) {
+        if (root == null) return;
+        if (root.getLocalSpool() != null) setLocalSpool(root.getLocalSpool());
+        if (root.getScanner() != null) setScanner(root.getScanner());
+        if (root.getHdfs() != null) setHdfs(root.getHdfs());
+        if (root.getUpload() != null) setUpload(root.getUpload());
+        if (root.getRetry() != null) setRetry(root.getRetry());
+        if (root.getManifest() != null) setManifest(root.getManifest());
+        if (root.getGc() != null) setGc(root.getGc());
+        if (root.getDiskWatermark() != null) setDiskWatermark(root.getDiskWatermark());
+        if (root.getMetrics() != null) setMetrics(root.getMetrics());
+    }
+
+    // ---- validation ----
+
+    void validate() {
+        Objects.requireNonNull(app, "agent.app is required");
+        Objects.requireNonNull(env, "agent.env is required");
+        Objects.requireNonNull(region, "agent.region is required");
+        Objects.requireNonNull(cluster, "agent.cluster is required");
+        Objects.requireNonNull(host, "agent.host is required");
+        Objects.requireNonNull(agentId, "agent.agentId is required");
+        Objects.requireNonNull(agentVersion, "agent.agentVersion is required");
+        Objects.requireNonNull(localSpool, "agent.localSpool is required").validate();
+        Objects.requireNonNull(scanner, "agent.scanner is required").validate();
+        Objects.requireNonNull(hdfs, "agent.hdfs is required").validate();
+        Objects.requireNonNull(upload, "agent.upload is required").validate();
+        Objects.requireNonNull(retry, "agent.retry is required").validate();
+        Objects.requireNonNull(manifest, "agent.manifest is required").validate();
+        Objects.requireNonNull(gc, "agent.gc is required").validate();
+        Objects.requireNonNull(diskWatermark, "agent.diskWatermark is required").validate();
+        Objects.requireNonNull(metrics, "agent.metrics is required").validate();
+    }
+
+    // ---- toString ----
+
+    @Override
+    public String toString() {
+        return "AgentConfig{"
+                + "app='" + app + '\''
+                + ", env='" + env + '\''
+                + ", region='" + region + '\''
+                + ", cluster='" + cluster + '\''
+                + ", host='" + host + '\''
+                + ", agentId='" + agentId + '\''
+                + ", agentVersion='" + agentVersion + '\''
+                + ", localSpool=" + localSpool
+                + ", scanner=" + scanner
+                + ", hdfs=" + hdfs
+                + ", upload=" + upload
+                + ", retry=" + retry
+                + ", manifest=" + manifest
+                + ", gc=" + gc
+                + ", diskWatermark=" + diskWatermark
+                + ", metrics=" + metrics
+                + '}';
     }
 }
