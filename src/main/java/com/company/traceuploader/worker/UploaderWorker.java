@@ -5,7 +5,7 @@ import com.company.traceuploader.commit.CommitResult;
 import com.company.traceuploader.commit.LocalFsCommitProtocol;
 import com.company.traceuploader.config.AgentConfig;
 import com.company.traceuploader.hdfs.HdfsClient;
-import com.company.traceuploader.hdfs.LocalFsHdfsClient;
+import com.company.traceuploader.hdfs.HdfsClientFactory;
 import com.company.traceuploader.manifest.JsonlManifestWriter;
 import com.company.traceuploader.manifest.ManifestRecord;
 import com.company.traceuploader.manifest.ManifestWriter;
@@ -174,9 +174,6 @@ public final class UploaderWorker {
     }
 
     private HdfsClient createHdfs() throws IOException {
-        if (!"localfs".equalsIgnoreCase(config.hdfs().implementation())) {
-            throw new IllegalArgumentException("Only localfs HDFS implementation is supported in Phase 4: " + config.hdfs().implementation());
-        }
-        return new LocalFsHdfsClient(config.hdfs().localRootForTestingPath());
+        return HdfsClientFactory.createHdfs(config.hdfs());
     }
 }

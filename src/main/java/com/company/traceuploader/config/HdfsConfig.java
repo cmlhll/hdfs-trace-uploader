@@ -9,6 +9,8 @@ public final class HdfsConfig {
     private String implementation = "localfs";
     private String localRootForTesting = "/tmp/fake_hdfs";
     private String hadoopConfDir = "/etc/hadoop/conf";
+    private String fsDefaultFS = "";
+    private boolean kerberosEnabled = false;
     private String nameService = "";
     private String rawBasePath = "/warehouse/raw_trace";
     private String stagingBasePath = "/warehouse/raw_trace/_staging";
@@ -55,6 +57,30 @@ public final class HdfsConfig {
 
     public String hadoopConfDir() {
         return hadoopConfDir;
+    }
+
+    public String getFsDefaultFS() {
+        return fsDefaultFS;
+    }
+
+    public void setFsDefaultFS(String fsDefaultFS) {
+        this.fsDefaultFS = fsDefaultFS;
+    }
+
+    public String fsDefaultFS() {
+        return fsDefaultFS;
+    }
+
+    public boolean isKerberosEnabled() {
+        return kerberosEnabled;
+    }
+
+    public void setKerberosEnabled(boolean kerberosEnabled) {
+        this.kerberosEnabled = kerberosEnabled;
+    }
+
+    public boolean kerberosEnabled() {
+        return kerberosEnabled;
     }
 
     public String getNameService() {
@@ -165,6 +191,8 @@ public final class HdfsConfig {
                 "implementation='" + implementation + '\'' +
                 ", localRootForTesting='" + localRootForTesting + '\'' +
                 ", hadoopConfDir='" + hadoopConfDir + '\'' +
+                ", fsDefaultFS='" + fsDefaultFS + '\'' +
+                ", kerberosEnabled=" + kerberosEnabled +
                 ", nameService='" + nameService + '\'' +
                 ", rawBasePath='" + rawBasePath + '\'' +
                 ", stagingBasePath='" + stagingBasePath + '\'' +
