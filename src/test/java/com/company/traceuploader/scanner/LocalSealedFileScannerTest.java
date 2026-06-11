@@ -1,6 +1,6 @@
 package com.company.traceuploader.scanner;
 
-import com.company.traceuploader.config.AgentConfig;
+import com.company.traceuploader.config.ScannerConfig;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -23,9 +23,11 @@ class LocalSealedFileScannerTest {
 
     @Test
     void scansOnlyDataFilesWithDoneMarkers() throws Exception {
-        AgentConfig.Scanner config = scannerConfig(0, 10);
+        ScannerConfig config = scannerConfig(0, 10);
         Files.writeString(tempDir.resolve("ready.jsonl"), "ok\n");
         Files.createFile(tempDir.resolve("ready.jsonl.done"));
+        setAgeToPast(tempDir.resolve("ready.jsonl"));
+        setAgeToPast(tempDir.resolve("ready.jsonl.done"));
         Files.writeString(tempDir.resolve("missing-marker.jsonl"), "skip\n");
 
         List<SealedFile> files = new LocalSealedFileScanner(tempDir, config, CLOCK).scan();
@@ -37,7 +39,7 @@ class LocalSealedFileScannerTest {
 
     @Test
     void ignoresWritingDirectoryAndTemporarySuffixes() throws Exception {
-        AgentConfig.Scanner config = scannerConfig(0, 10);
+        ScannerConfig config = scannerConfig(0, 10);
         Path writing = tempDir.resolve("writing");
         Files.createDirectory(writing);
         Files.writeString(writing.resolve("active.jsonl"), "active\n");
@@ -48,6 +50,8 @@ class LocalSealedFileScannerTest {
         }
         Files.writeString(tempDir.resolve("ready.jsonl"), "ok\n");
         Files.createFile(tempDir.resolve("ready.jsonl.done"));
+        setAgeToPast(tempDir.resolve("ready.jsonl"));
+        setAgeToPast(tempDir.resolve("ready.jsonl.done"));
 
         List<SealedFile> files = new LocalSealedFileScanner(tempDir, config, CLOCK).scan();
 
@@ -57,7 +61,7 @@ class LocalSealedFileScannerTest {
 
     @Test
     void respectsMinStableMillisForDataAndMarker() throws Exception {
-        AgentConfig.Scanner config = scannerConfig(5_000, 10);
+        ScannerConfig config = scannerConfig(5_000, 10);
         Path oldData = tempDir.resolve("old.jsonl");
         Path oldMarker = tempDir.resolve("old.jsonl.done");
         Files.writeString(oldData, "old\n");
@@ -82,10 +86,12 @@ class LocalSealedFileScannerTest {
 
     @Test
     void respectsMaxFilesPerScanAndSortsByFileName() throws Exception {
-        AgentConfig.Scanner config = scannerConfig(0, 2);
+        ScannerConfig config = scannerConfig(0, 2);
         for (String name : List.of("b.jsonl", "a.jsonl", "c.jsonl")) {
             Files.writeString(tempDir.resolve(name), name + "\n");
             Files.createFile(tempDir.resolve(name + ".done"));
+            setAgeToPast(tempDir.resolve(name));
+            setAgeToPast(tempDir.resolve(name + ".done"));
         }
 
         List<SealedFile> files = new LocalSealedFileScanner(tempDir, config, CLOCK).scan();
@@ -97,15 +103,22 @@ class LocalSealedFileScannerTest {
 
     @Test
     void returnsEmptyListWhenSealedDirDoesNotExist() throws Exception {
-        AgentConfig.Scanner config = scannerConfig(0, 10);
+        ScannerConfig config = scannerConfig(0, 10);
         List<SealedFile> files = new LocalSealedFileScanner(tempDir.resolve("missing"), config, CLOCK).scan();
         assertTrue(files.isEmpty());
     }
 
-    private static AgentConfig.Scanner scannerConfig(long minStableMillis, int maxFilesPerScan) {
-        AgentConfig.Scanner config = new AgentConfig.Scanner();
-        config.setMinStableMillis(minStableMillis);
+    private static ScannerConfig scannerConfig(long minStableMillis, int maxFilesPerScan) {
+        // ScannerConfig doesn't have setMinStableMillis() directly.
+        // It has minStableAgeSeconds. We construct from scratch.
+        ScannerConfig config = new ScannerConfig();
+        config.setDataFileSuffixes(List.of(".jsonl", ".jsonl.zst", ".log", ".log.zst"));
+        config.setMinStableAgeSeconds(minStableMillis / 1000L);
         config.setMaxFilesPerScan(maxFilesPerScan);
         return config;
+    }
+
+    private static void setAgeToPast(Path path) throws Exception {
+        Files.setLastModifiedTime(path, FileTime.from(Instant.parse("2026-06-10T11:59:00Z")));
     }
 }

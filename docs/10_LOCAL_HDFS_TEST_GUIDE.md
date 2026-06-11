@@ -275,3 +275,65 @@ Codex 必须至少实现或预留以下测试：
 6. 本地文件只有 manifest 成功后才进入 committed/GC；
 7. 可以通过 hdfs dfs 命令验证结果。
 ```
+
+---
+
+## 12. HdfsClientFactory 抽象层
+
+项目通过 `HdfsClientFactory` 在本地模拟和真实 HDFS 之间切换：
+
+```yaml
+hdfs:
+  implementation: localfs   # 使用 LocalFsHdfsClient（本地文件系统模拟 HDFS）
+  # --- 或 ---
+  implementation: hadoop    # 使用 HadoopHdfsClient（真实 Hadoop HDFS 客户端）
+  hadoopConfDir: /etc/hadoop/conf
+  fsDefaultFS: hdfs://localhost:9000
+  kerberosEnabled: false
+```
+
+### HdfsClientFactory 路由逻辑
+
+- `implementation == "localfs"` -> `new LocalFsHdfsClient(config.hdfs().localRootForTestingPath())`
+- `implementation == "hadoop"` -> `new HadoopHdfsClient(config.hdfs())`
+
+### HadoopHdfsClient 说明
+
+`HadoopHdfsClient` 使用 Hadoop Java Client API（`org.apache.hadoop.fs.FileSystem`）：
+
+1. 从 `hadoopConfDir` 加载 `core-site.xml` 和 `hdfs-site.xml`；
+2. 如果配置中设置 `fsDefaultFS`，覆盖 `fs.defaultFS`；
+3. 如果 `kerberosEnabled=true`，设置 Kerberos 认证；
+4. 所有 HDFS 操作（exists、upload、rename、delete、size、checksum）均通过 Hadoop FileSystem API 实现。
+
+**依赖要求**：`HadoopHdfsClient` 需要 Hadoop 客户端库（`hadoop-client:3.3.6`），通过 Maven provided scope 引入，运行时由用户提供 classpath。
+
+### 编译方式
+
+```bash
+# 默认编译（包含 Hadoop provided 依赖，仅编译期需要）
+/tmp/apache-maven-3.9.16/bin/mvn clean package -DskipTests
+
+# 跳过 Hadoop 相关测试（机器上没有 Hadoop 时）
+/tmp/apache-maven-3.9.16/bin/mvn clean test -Dtest=!HadoopHdfsClientTest
+```
+
+### 运行方式
+
+**使用 LocalFsHdfsClient（无需 Hadoop）**：
+```bash
+java -jar target/hdfs-trace-uploader.jar --config config/example-agent.yaml --once
+```
+
+**使用 HadoopHdfsClient（需要本机伪分布式 HDFS）**：
+```bash
+export HADOOP_CONF_DIR=/path/to/hadoop/etc/hadoop
+java -jar target/hdfs-trace-uploader.jar --config config/local-hdfs-agent.yaml --once
+```
+
+### 验证层级
+
+- **Level 0**: LocalFsHdfsClient -> `find /tmp/fake_hdfs -type f` 查看结果
+- **Level 1**: HadoopHdfsClient (MiniDFSCluster) -> JUnit 集成测试
+- **Level 2**: HadoopHdfsClient (本地伪分布式) -> `hdfs dfs -ls` 验证
+- **Level 3**: HadoopHdfsClient (生产集群) -> 生产运维流程

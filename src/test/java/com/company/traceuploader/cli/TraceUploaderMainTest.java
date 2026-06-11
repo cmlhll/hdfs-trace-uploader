@@ -22,13 +22,12 @@ class TraceUploaderMainTest {
         Files.writeString(sealedDir.resolve("trace-a.jsonl"), "{}\n");
         Files.createFile(sealedDir.resolve("trace-a.jsonl.done"));
         Path config = tempDir.resolve("agent.yaml");
-        Files.writeString(config, """
-                localSpool:
-                  sealedDir: %s
-                scanner:
-                  minStableMillis: 0
-                  maxFilesPerScan: 10
-                """.formatted(sealedDir));
+        Files.writeString(config,
+                String.format("localSpool:\n" +
+                "  sealedDir: %s\n" +
+                "scanner:\n" +
+                "  minStableMillis: 0\n" +
+                "  maxFilesPerScan: 10\n", sealedDir.toString()));
 
         ByteArrayOutputStream stdout = new ByteArrayOutputStream();
         PrintStream originalOut = System.out;

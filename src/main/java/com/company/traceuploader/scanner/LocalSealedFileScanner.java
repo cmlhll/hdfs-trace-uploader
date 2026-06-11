@@ -1,6 +1,6 @@
 package com.company.traceuploader.scanner;
 
-import com.company.traceuploader.config.AgentConfig;
+import com.company.traceuploader.config.ScannerConfig;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /** Scans a sealed directory for stable data files that have matching done markers. */
@@ -17,15 +18,17 @@ public final class LocalSealedFileScanner implements SealedFileScanner {
     private final Path sealedDir;
     private final String markerSuffix;
     private final List<String> ignoredSuffixes;
+    private final List<String> dataFileSuffixes;
     private final long minStableMillis;
     private final int maxFilesPerScan;
     private final Clock clock;
 
-    public LocalSealedFileScanner(Path sealedDir, AgentConfig.Scanner scannerConfig, Clock clock) {
+    public LocalSealedFileScanner(Path sealedDir, ScannerConfig scannerConfig, Clock clock) {
         this.sealedDir = Objects.requireNonNull(sealedDir, "sealedDir");
         Objects.requireNonNull(scannerConfig, "scannerConfig");
         this.markerSuffix = scannerConfig.markerSuffix();
         this.ignoredSuffixes = List.copyOf(scannerConfig.ignoredSuffixes());
+        this.dataFileSuffixes = List.copyOf(scannerConfig.getDataFileSuffixes());
         this.minStableMillis = scannerConfig.minStableMillis();
         this.maxFilesPerScan = scannerConfig.maxFilesPerScan();
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -44,7 +47,7 @@ public final class LocalSealedFileScanner implements SealedFileScanner {
                     .filter(this::hasMarker)
                     .filter(this::isStable)
                     .limit(maxFilesPerScan)
-                    .toList();
+                    .collect(Collectors.toList());
             return toSealedFiles(dataFiles);
         }
     }
@@ -54,7 +57,10 @@ public final class LocalSealedFileScanner implements SealedFileScanner {
         if (fileName.endsWith(markerSuffix)) {
             return false;
         }
-        return ignoredSuffixes.stream().noneMatch(fileName::endsWith);
+        if (ignoredSuffixes.stream().anyMatch(fileName::endsWith)) {
+            return false;
+        }
+        return dataFileSuffixes.stream().anyMatch(fileName::endsWith);
     }
 
     private boolean hasMarker(Path path) {
@@ -62,6 +68,9 @@ public final class LocalSealedFileScanner implements SealedFileScanner {
     }
 
     private boolean isStable(Path dataPath) {
+        if (minStableMillis == 0) {
+            return true;
+        }
         try {
             long nowMillis = clock.millis();
             Path markerPath = markerPath(dataPath);

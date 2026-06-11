@@ -62,17 +62,16 @@ class MetadataServiceTest {
 
     private AgentConfig config() throws Exception {
         Path configFile = tempDir.resolve("agent.yaml");
-        Files.writeString(configFile, """
-                localSpool:
-                  sealedDir: /tmp/trace_spool/sealed
-                  stateDir: /tmp/trace_spool/state
-                hdfs:
-                  implementation: localfs
-                  localRootForTesting: /tmp/fake_hdfs
-                  rawBasePath: /warehouse/raw_trace
-                  stagingBasePath: /warehouse/raw_trace/_staging
-                  bucketCount: 16
-                """);
+        Files.writeString(configFile,
+                "localSpool:\n" +
+                "  sealedDir: /tmp/trace_spool/sealed\n" +
+                "  stateDir: /tmp/trace_spool/state\n" +
+                "hdfs:\n" +
+                "  implementation: localfs\n" +
+                "  localRootForTesting: /tmp/fake_hdfs\n" +
+                "  rawBasePath: /warehouse/raw_trace\n" +
+                "  stagingBasePath: /warehouse/raw_trace/_staging\n" +
+                "  bucketCount: 16\n");
         return new ConfigLoader().load(configFile);
     }
 }
